@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"order-service/internal/domain"
 	"order-service/internal/repository"
+	"strconv"
 )
 
 type OrderHandler struct {
@@ -39,4 +40,44 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(order)
+}
+
+func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		http.Error(w, "missing id parameter", http.StatusBadRequest)
+		return
+	}
+	orderID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id parameter", http.StatusBadRequest)
+		return
+	}
+	order, err := h.repo.GetOrderByID(orderID)
+	if err != nil {
+		http.Error(w, "order not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(order)
+}
+
+func (h *OrderHandler) GetOrdersByUserID(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.URL.Query().Get("user_id")
+	if userIDStr == "" {
+		http.Error(w, "missing user_id parameter", http.StatusBadRequest)
+		return
+	}
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid user_id parameter", http.StatusBadRequest)
+		return
+	}
+	orders, err := h.repo.GetOrdersByUserID(userID)
+	if err != nil {
+		http.Error(w, "failed to get orders: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(orders)
 }

@@ -1,0 +1,175 @@
+openapi: 3.0.0
+info:
+  title: Gozon API
+  description: Микросервисная архитектура (Order + Payment + Gateway)
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: API Gateway
+
+paths:
+  /accounts:
+    post:
+      summary: Создать аккаунт пользователя
+      tags: [Accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Аккаунт создан
+        '400':
+          description: Невалидные данные
+        '500':
+          description: Ошибка сервера
+
+  /accounts/deposit:
+    post:
+      summary: Пополнить баланс
+      tags: [Accounts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                amount:
+                  type: integer
+                  example: 1000
+      responses:
+        '200':
+          description: Баланс пополнен
+        '400':
+          description: Невалидные данные
+        '404':
+          description: Аккаунт не найден
+        '500':
+          description: Ошибка сервера
+
+  /accounts/balance:
+    get:
+      summary: Узнать баланс
+      tags: [Accounts]
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: integer
+          required: true
+          description: ID пользователя
+      responses:
+        '200':
+          description: Баланс получен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: integer
+        '404':
+          description: Аккаунт не найден
+        '500':
+          description: Ошибка сервера
+
+  /orders:
+    post:
+      summary: Создать заказ
+      description: Создает заказ и асинхронно списывает деньги через RabbitMQ
+      tags: [Orders]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  example: 1
+                amount:
+                  type: integer
+                  example: 200
+      responses:
+        '200':
+          description: Заказ принят в обработку
+        '400':
+          description: Невалидные данные
+        '404':
+          description: Пользователь не найден
+        '500':
+          description: Ошибка сервера
+
+    get:
+      summary: Получить список заказов пользователя
+      tags: [Orders]
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: integer
+          required: true
+          description: ID пользователя
+      responses:
+        '200':
+          description: Список заказов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    status:
+                      type: string
+                      example: "paid"
+                    amount:
+                      type: integer
+                    created_at:
+                      type: string
+        '404':
+          description: Пользователь не найден
+
+  /orders/by-id:
+    get:
+      summary: Получить статус заказа по ID
+      tags: [Orders]
+      parameters:
+        - in: query
+          name: id
+          schema:
+            type: integer
+          required: true
+          description: ID заказа
+      responses:
+        '200':
+          description: Информация о заказе
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                  status:
+                    type: string
+                    example: "paid"
+                  amount:
+                    type: integer
+        '404':
+          description: Заказ не найден
+        '500':
+          description: Ошибка сервера

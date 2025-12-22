@@ -6,15 +6,13 @@ services:
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: postgres
+      POSTGRES_DB: gozon
     ports:
       - "5435:5432"
     volumes:
-      - ./deploy/init.sql:/docker-entrypoint-initdb.d/init.sql
-    networks:
-      - gozon-network
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U user -d gozon"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -28,9 +26,53 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: user
       RABBITMQ_DEFAULT_PASS: password
-    networks:
-      - gozon-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
-networks:
-  gozon-network:
-    driver: bridge
+  order-service:
+    build: ./order-service
+    container_name: gozon-order
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+
+  payment-service:
+    build: ./payment-service
+    container_name: gozon-payment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8082:8080"
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: gozon-gateway
+    depends_on:
+      - order-service
+      - payment-service
+    ports:
+      - "8080:8080"
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    container_name: gozon-swagger
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./api-gateway/openapi.yaml:/foo/swagger.yaml
+    environment:
+      SWAGGER_JSON: /foo/swagger.yaml
+      CORS_ALLOWED_ORIGINS: "*"
+
+volumes:
+  postgres_data:
