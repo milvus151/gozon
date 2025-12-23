@@ -2,13 +2,15 @@ FROM golang:1.25.3-alpine AS builder
 
 WORKDIR /app
 
-RUN go mod init api-gateway || true
+COPY go.mod go.sum ./
+
+RUN go mod download
 
 COPY . .
 
 RUN go mod tidy
 
-RUN go build -o api-gateway cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o api-gateway cmd/main.go
 
 FROM alpine:latest
 WORKDIR /app

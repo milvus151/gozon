@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gozon Store</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 { color: #333; margin-bottom: 10px; font-size: 32px; }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 30px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            transition: all 0.3s;
+        }
+        .status-dot.connected { background: #28a745; box-shadow: 0 0 10px #28a745; }
+        .status-dot.disconnected { background: #dc3545; }
+        .section {
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .section h2 { color: #333; font-size: 18px; margin-bottom: 15px; }
+        .form-group { margin-bottom: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .form-group label { font-weight: 500; min-width: 120px; color: #555; }
+        .form-group input { flex: 1; min-width: 150px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .form-group button { padding: 10px 16px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.3s; }
+        .form-group button:hover { background: #5568d3; transform: translateY(-2px); }
+        .btn-buy { background: #28a745; color: white; }
+        .btn-buy:hover { background: #218838; transform: translateY(-2px); }
+        .notification {
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            color: white;
+            animation: slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .success { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); }
+        .error { background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%); }
+        .info { background: linear-gradient(135deg, #17a2b8 0%, #667eea 100%); }
+        @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .input-group { display: flex; gap: 10px; align-items: center; width: 100%; }
+        .input-group input { flex: 1; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Gozon Store</h1>
+
+    <div class="status-bar">
+        <div class="status-dot disconnected" id="statusDot"></div>
+        <span id="statusText">WebSocket: Disconnected</span>
+        <span style="margin-left: auto; color: #666;">User ID: <strong id="displayUserId">1</strong></span>
+    </div>
+
+    <div class="section">
+        <h2>Settings</h2>
+        <div class="form-group">
+            <label>Your User ID:</label>
+            <input type="number" id="userId" value="1" min="1">
+            <button onclick="changeUserId()">Change User</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Account Management</h2>
+        <div class="form-group">
+            <button class="btn-primary" onclick="createAccount()">Create Account</button>
+        </div>
+        <div class="form-group">
+            <label>Deposit Amount ($):</label>
+            <div class="input-group">
+                <input type="number" id="depositAmount" value="1000" min="1" placeholder="Enter amount">
+                <button onclick="depositMoney()">Deposit</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <button class="btn-primary" onclick="getBalance()">Check Balance</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Purchase</h2>
+        <div class="form-group">
+            <label>Amount to Spend ($):</label>
+            <div class="input-group">
+                <input type="number" id="orderAmount" value="200" min="1" placeholder="Enter amount">
+                <button class="btn-buy" onclick="createOrder()">Buy</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Real-time Notifications</h2>
+        <div id="notifications"></div>
+    </div>
+</div>
+
+<script>
+    let ws;
+    let reconnectTimeout = null;
+    let pingInterval = null;
+    let isExplicitDisconnect = false;
+
+    function connectWebSocket() {
+        const userId = document.getElementById('userId').value;
+        if (ws) {
+            ws.onclose = null;
+            ws.close();
+        }
+
+        try {
+            ws = new WebSocket(`ws://localhost:8080/ws?user_id=${userId}`);
+            ws.onopen = () => {
+                updateStatus(true);
+                addNotif("WebSocket Connected", "info");
+                console.log("WS Connected for User:", userId);
+                if (pingInterval) clearInterval(pingInterval);
+                pingInterval = setInterval(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send("ping");
+                    }
+                }, 30000);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("WS Message:", data);
+
+                    let type = data.status === "PaymentSucceeded" ? "success" : "error";
+
+                    addNotif(`Order #${data.order_id}: ${data.status}`, type);
+                } catch (err) {
+                    console.log("KeepAlive response or error", err);
+                }
+            };
+
+            ws.onclose = () => {
+                if (pingInterval) clearInterval(pingInterval);
+                updateStatus(false);
+                if (!isExplicitDisconnect) {
+                    console.log("WS Lost. Reconnecting in 3s...");
+                    if (reconnectTimeout) clearTimeout(reconnectTimeout);
+                    reconnectTimeout = setTimeout(connectWebSocket, 3000);
+                }
+            };
+
+            ws.onerror = (err) => {
+                console.error("WS Error:", err);
+                ws.close();
+            };
+
+        } catch (err) {
+            console.error("Failed to create WebSocket:", err);
+        }
+    }
+
+    function changeUserId() {
+        const newId = document.getElementById('userId').value;
+        document.getElementById('displayUserId').textContent = newId;
+
+        isExplicitDisconnect = true;
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+
+        connectWebSocket();
+
+        setTimeout(() => { isExplicitDisconnect = false; }, 1000);
+
+        addNotif("User ID changed", "info");
+    }
+
+    function updateStatus(connected) {
+        const dot = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        if (connected) {
+            dot.className = 'status-dot connected';
+            text.textContent = 'WebSocket: Connected';
+        } else {
+            dot.className = 'status-dot disconnected';
+            text.textContent = 'WebSocket: Disconnected';
+        }
+    }
+
+    async function createAccount() {
+        const userId = document.getElementById('userId').value;
+        try {
+            const res = await fetch('http://localhost:8080/accounts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: parseInt(userId) })
+            });
+            if (res.ok) addNotif("Account created", "success");
+            else addNotif("Error: " + await res.text(), "error");
+        } catch (err) { addNotif("Error: " + err.message, "error"); }
+    }
+
+    async function depositMoney() {
+        const userId = document.getElementById('userId').value;
+        const amount = document.getElementById('depositAmount').value;
+        try {
+            const res = await fetch('http://localhost:8080/accounts/deposit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: parseInt(userId), amount: parseInt(amount) })
+            });
+            if (res.ok) addNotif(`Deposited $${amount}`, "success");
+            else addNotif("Error: " + await res.text(), "error");
+        } catch (err) { addNotif("Error: " + err.message, "error"); }
+    }
+
+    async function getBalance() {
+        const userId = document.getElementById('userId').value;
+        try {
+            const res = await fetch(`http://localhost:8080/accounts/balance?user_id=${userId}`);
+            if (res.ok) {
+                const data = await res.json();
+                addNotif(`Balance: $${data.balance}`, "info");
+            } else addNotif("User not found", "error");
+        } catch (err) { addNotif("Error: " + err.message, "error"); }
+    }
+
+    async function createOrder() {
+        const userId = document.getElementById('userId').value;
+        const amount = document.getElementById('orderAmount').value;
+        try {
+            const res = await fetch('http://localhost:8080/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: parseInt(userId), amount: parseInt(amount) })
+            });
+            if (res.ok) addNotif(`Order placed for $${amount}...`, "info");
+            else addNotif("Error: " + await res.text(), "error");
+        } catch (err) { addNotif("Error: " + err.message, "error"); }
+    }
+
+    function addNotif(msg, type) {
+        const div = document.createElement('div');
+        div.className = `notification ${type}`;
+        div.textContent = msg;
+        document.getElementById('notifications').prepend(div);
+        setTimeout(() => {
+            div.style.opacity = '0';
+            setTimeout(() => div.remove(), 300);
+        }, 5000);
+    }
+
+    window.addEventListener('load', connectWebSocket);
+</script>
+</body>
+</html>

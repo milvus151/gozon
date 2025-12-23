@@ -18,8 +18,10 @@ func NewOutboxProcessor(db *sql.DB, conn *amqp.Connection) (*OutboxProcessor, er
 	if err != nil {
 		return nil, err
 	}
-	_, err = ch.QueueDeclare(
-		"payments_results_queue",
+
+	err = ch.ExchangeDeclare(
+		"payment_events_fanout",
+		"fanout",
 		true,
 		false,
 		false,
@@ -43,12 +45,13 @@ func (processor *OutboxProcessor) Start() {
 
 func (processor *OutboxProcessor) processEvents() {
 	rows, err := processor.db.Query(`
-	SELECT id, type, payload FROM outbox_events
-	WHERE status = 'pending'
-	LIMIT 10
+		SELECT id, type, payload FROM outbox_events
+		WHERE status = 'pending'
+		LIMIT 10
 	`)
 	if err != nil {
 		log.Printf("payments outbox: query error: %v", err)
+		return
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -60,8 +63,8 @@ func (processor *OutboxProcessor) processEvents() {
 			continue
 		}
 		err = processor.rabbitCh.Publish(
+			"payment_events_fanout",
 			"",
-			"payments_results_queue",
 			false,
 			false,
 			amqp.Publishing{
@@ -78,7 +81,7 @@ func (processor *OutboxProcessor) processEvents() {
 			UPDATE outbox_events
 			SET status = 'processed'
 			WHERE id = $1
-			`, id)
+		`, id)
 		if err != nil {
 			log.Printf("payments outbox: update status error for id=%d: %v", id, err)
 		} else {

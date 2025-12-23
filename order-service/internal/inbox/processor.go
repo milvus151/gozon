@@ -18,13 +18,23 @@ func NewInboxProcessor(db *sql.DB, conn *amqp.Connection) (*InboxProcessor, erro
 	if err != nil {
 		return nil, err
 	}
-	_, err = ch.QueueDeclare(
-		"payments_results_queue",
-		true,
+	err = ch.ExchangeDeclare("payment_events_fanout", "fanout", true, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	q, err := ch.QueueDeclare("payments_results_queue", true, false, false, false, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ch.QueueBind(
+		q.Name,
+		"",
+		"payment_events_fanout",
 		false,
-		false,
-		false,
-		nil)
+		nil,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -75,10 +85,10 @@ func (processor *InboxProcessor) processMessage(message amqp.Delivery) {
 		return
 	}
 	_, err := processor.db.Exec(`
-        UPDATE orders
-        SET status = $1
-        WHERE id = $2
-    `, newStatus, payload.OrderID)
+		UPDATE orders
+		SET status = $1
+		WHERE id = $2
+	`, newStatus, payload.OrderID)
 	if err != nil {
 		log.Printf("order inbox: update error: %v", err)
 		message.Nack(false, true)
