@@ -400,7 +400,7 @@ func (h *WSHub) Broadcast(userID int, message []byte) {
 
 1. Создай аккаунт (user_id: 2)
 2. Пополни баланс (amount: 100)
-3. Создай заказ (amount: 500) — больше, чем есть
+3. Создай заказ (amount: 500) - больше, чем есть
 4. **Ожидаемый результат:**
    - Появится **красное** уведомление "Order 2: failed"
    - Order Status в БД: `cancelled`
@@ -411,10 +411,10 @@ func (h *WSHub) Broadcast(userID int, message []byte) {
 1. Открой **http://localhost:15672** (user: user, pass: password)
 2. Перейди на вкладку **Queues and Streams**
 3. **Проверь очереди:**
-   - `orders_queue` — сюда Order Service отправляет события
-   - `payments_results_queue` — отсюда Gateway получает результаты
+   - `orders_queue` - сюда Order Service отправляет события
+   - `payments_results_queue` - отсюда Gateway получает результаты
 4. **Проверь Exchange:**
-   - `payment_events_fanout` — fanout exchange (один-ко-всем рассылка)
+   - `payment_events_fanout` - fanout exchange (один-ко-всем рассылка)
 
 ### Типичные логи (успешный платёж)
 
@@ -434,10 +434,10 @@ gozon-gateway  | Gateway received event: {"order_id":1,"user_id":1,"status":"suc
 Ни одно сообщение не потеряется, даже если сервис упадёт
 
 ### 2. **Идемпотентность**
-Одно и то же сообщение можно обработать много раз — результат одинаков
+Одно и то же сообщение можно обработать много раз - результат одинаков
 
 ### 3. **Асинхронность**
-Клиент не ждёт ответа платёжной системы — получает уведомление по WebSocket
+Клиент не ждёт ответа платёжной системы - получает уведомление по WebSocket
 
 ### 4. **Масштабируемость**
 Легко добавить новые сервисы и workers
