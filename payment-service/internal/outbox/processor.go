@@ -84,8 +84,8 @@ func (processor *OutboxProcessor) processEvents() {
 		`, id)
 		if err != nil {
 			log.Printf("payments outbox: update status error for id=%d: %v", id, err)
-		} else {
-			log.Printf("payments outbox: event %d (%s) sent", id, eventType)
+			continue
 		}
+		log.Printf("payments outbox: event %d (%s) sent successfully", id, eventType)
 	}
 }

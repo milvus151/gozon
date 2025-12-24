@@ -119,7 +119,7 @@ func startRabbitMQListener() {
 		log.Fatal(err)
 	}
 
-	msgs, err := ch.Consume(q.Name, "", true, false, false, false, nil)
+	msgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -136,10 +136,15 @@ func startRabbitMQListener() {
 				UserID  int    `json:"user_id"`
 			}
 			if err := json.Unmarshal(d.Body, &event); err != nil {
+				log.Printf("Failed to unmarshal event: %v", err)
+				d.Nack(false, false)
 				continue
 			}
 			if event.UserID != 0 {
 				hub.Broadcast(event.UserID, d.Body)
+			}
+			if err := d.Ack(false); err != nil {
+				log.Printf("Failed to ack message: %v", err)
 			}
 		}
 	}()

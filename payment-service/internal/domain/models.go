@@ -16,26 +16,3 @@ type Account struct {
 	Balance   int64     `json:"balance"`
 	CreatedAt time.Time `json:"created_at"`
 }
-
-type AccountTransaction struct {
-	ID        int64     `json:"id"`
-	AccountID int64     `json:"account_id"`
-	Amount    int64     `json:"amount"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type InboxMessage struct {
-	ID        int64     `json:"id"`
-	MessageID int64     `json:"message_id"`
-	Type      string    `json:"type"`
-	Payload   []byte    `json:"payload"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type OutboxEvent struct {
-	ID        int64     `json:"id"`
-	Type      string    `json:"type"`
-	Payload   []byte    `json:"payload"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-}

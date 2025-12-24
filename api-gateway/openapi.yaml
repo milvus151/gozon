@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Gozon API
-  description: Микросервисная архитектура (Order + Payment + Gateway)
+  description: Микросервисная архитектура (Order + Payment + API-Gateway)
   version: 1.0.0
 servers:
   - url: http://localhost:8080

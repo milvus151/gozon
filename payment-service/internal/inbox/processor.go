@@ -75,6 +75,15 @@ func (processor *InboxProcessor) processMessage(message amqp.Delivery) {
 		return
 	}
 	defer tx.Rollback()
+	_, err = tx.Exec(`
+        INSERT INTO inbox_messages (message_id, type, payload)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (message_id) DO NOTHING
+    `, payload.OrderID, "PaymentRequest", message.Body)
+
+	if err != nil {
+		log.Printf("Warning: failed to write to inbox_messages: %v", err)
+	}
 	success := false
 	var accountID int64
 	var balance int64
