@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"payment-service/internal/domain"
 	"payment-service/internal/repository"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -126,10 +127,16 @@ func (processor *InboxProcessor) processMessage(message amqp.Delivery) {
 			success = false
 		}
 	}
+	var payStatus domain.PaymentStatus
 	resultEventType := "PaymentFailed"
 	if success {
+		payStatus = domain.PaymentStatusSuccess
 		resultEventType = "PaymentSucceeded"
+	} else {
+		payStatus = domain.PaymentStatusFailed
+		resultEventType = "PaymentFailed"
 	}
+	log.Printf("Payment result for Order %d: pay_status=%s event_status=%s", payload.OrderID, payStatus, resultEventType)
 	resultPayload, err := json.Marshal(map[string]interface{}{
 		"order_id": payload.OrderID,
 		"user_id":  payload.UserID,

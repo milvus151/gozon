@@ -92,14 +92,14 @@ func createTables(db *sql.DB) {
         id SERIAL PRIMARY KEY,
         user_id BIGINT NOT NULL,
         amount BIGINT NOT NULL,
-        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        status VARCHAR(50) NOT NULL DEFAULT 'new',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS outbox (
         id SERIAL PRIMARY KEY,
         event_type VARCHAR(50) NOT NULL,
         payload JSONB NOT NULL,
-        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        status VARCHAR(20) NOT NULL DEFAULT 'new',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );`
 	_, err := db.Exec(query)

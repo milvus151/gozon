@@ -5,7 +5,6 @@ import "time"
 type PaymentStatus string
 
 const (
-	PaymentStatusPending PaymentStatus = "pending"
 	PaymentStatusSuccess PaymentStatus = "success"
 	PaymentStatusFailed  PaymentStatus = "failed"
 )

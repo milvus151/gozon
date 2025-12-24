@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"order-service/internal/domain"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -73,22 +74,22 @@ func (processor *InboxProcessor) processMessage(message amqp.Delivery) {
 		return
 	}
 	log.Printf("order inbox: received payment result for order %d: %s", payload.OrderID, payload.Status)
-	var newStatus string
+	var newStatus domain.OrderStatus
 	switch payload.Status {
 	case "PaymentSucceeded":
-		newStatus = "paid"
+		newStatus = domain.OrderStatusFinished
 	case "PaymentFailed":
-		newStatus = "payment_failed"
+		newStatus = domain.OrderStatusCancelled
 	default:
 		log.Printf("order inbox: unknown status: %s", payload.Status)
 		message.Ack(false)
 		return
 	}
 	_, err := processor.db.Exec(`
-		UPDATE orders
-		SET status = $1
-		WHERE id = $2
-	`, newStatus, payload.OrderID)
+    	UPDATE orders
+    	SET status = $1
+    	WHERE id = $2
+	`, string(newStatus), payload.OrderID)
 	if err != nil {
 		log.Printf("order inbox: update error: %v", err)
 		message.Nack(false, true)

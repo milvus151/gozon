@@ -50,7 +50,7 @@ func (p *OutboxProcessor) processEvents() {
 	rows, err := p.db.Query(`
 	SELECT id, event_type, payload
 	FROM outbox 
-	WHERE status = 'pending'
+	WHERE status = 'new'
 	LIMIT 10
 	`)
 	if err != nil {

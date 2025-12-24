@@ -25,7 +25,7 @@ func (r *OrderRepository) CreateOrderWithOutbox(order *domain.Order) error {
 	INSERT INTO orders (user_id, amount, status) 
 	VALUES ($1, $2, $3)
 	RETURNING id, created_at, status`
-	err = tx.QueryRow(queryOrder, order.UserID, order.Amount, domain.OrderStatusPending).
+	err = tx.QueryRow(queryOrder, order.UserID, order.Amount, domain.OrderStatusNew).
 		Scan(&order.ID, &order.CreatedAt, &order.Status)
 	if err != nil {
 		return fmt.Errorf("failed to insert order: %w", err)
@@ -38,7 +38,7 @@ func (r *OrderRepository) CreateOrderWithOutbox(order *domain.Order) error {
 	payloadBytes, _ := json.Marshal(payloadMap)
 	queryOutbox := `
 	INSERT INTO outbox (event_type, payload, status)
-	VALUES ($1, $2, 'pending')`
+	VALUES ($1, $2, 'new')`
 	_, err = tx.Exec(queryOutbox, "OrderCreated", payloadBytes)
 	if err != nil {
 		return fmt.Errorf("failed to insert outbox: %w", err)
