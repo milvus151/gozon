@@ -23,9 +23,9 @@
     │   паттерн     │                  │ - Outbox паттерн   │
     └────┬──────────┘                  └──────┬─────────────┘
          │                                    │
-         │         ┌──────────────────────────┘
-         │         │
-         │    RabbitMQ (Port 5672)
+         │           ┌────────────────────────┘
+         │           │
+         │         RabbitMQ (Port 5672)
          │    rabbitmq-management (Port 15672)
          │    
          ├────────► orders_queue ──────────────► Payment Service
@@ -40,6 +40,8 @@
     - accounts table
     - outbox_events table
     - inbox_messages table
+    - account_transactions table
+    - outbox table
 ```
 
 **Ключевая особенность:** Благодаря **Inbox/Outbox паттернам**, все сообщения гарантированно доставляются, даже если один из сервисов временно недоступен.
@@ -253,7 +255,7 @@ Response: 200 OK
 7. Фронт показывает красное уведомление
 ```
 
-### Сценарий 3: Resilience (сервис упал и восстановился)
+### Сценарий 3: Сервис упал и восстановился
 
 ```
 1. Заказ создан, отправлен в Outbox таблицу со статусом "pending"
@@ -298,7 +300,7 @@ Response: 200 OK
 
 ## Статусы заказов и платежей
 
-### Order Status (order_service/internal/domain/models.go)
+### Order Status (order-service/internal/domain/models.go)
 
 ```
 type OrderStatus string
@@ -316,7 +318,7 @@ new -> finished    (если платёж успешен)
 new -> cancelled   (если платёж не прошёл)
 ```
 
-### Payment Status (payment_service/internal/domain/models.go)
+### Payment Status (payment-service/internal/domain/models.go)
 
 ```
 type PaymentStatus string
@@ -345,38 +347,6 @@ status = 'processed'  -- Успешно отправлено в RabbitMQ
 2. **Gateway** хранит в памяти map: `map[userID][]*websocket.Conn`
 3. **Payment Service -> Gateway:** Отправляет `payment_events_fanout`
 4. **Gateway -> Фронт:** Пересылает по WebSocket клиентам с соответствующим `user_id`
-
-### Код Gateway (api-gateway/cmd/main.go)
-
-```
-// WebSocket слушатель (слушает payment_events_fanout от RabbitMQ)
-func startRabbitMQListener() {
-    msgs, _ := ch.Consume("payments_results_queue", ...)
-    for msg := range msgs {
-        var event struct {
-            OrderID int    `json:"order_id"`
-            UserID  int    `json:"user_id"`
-            Status  string `json:"status"`  // "success" или "failed"
-        }
-        json.Unmarshal(msg.Body, &event)
-        
-        if event.UserID != 0 {
-            hub.Broadcast(event.UserID, msg.Body)  // Отправляем в WebSocket
-        }
-    }
-}
-
-// Broadcast отправляет сообщение всем клиентам user'а
-func (h *WSHub) Broadcast(userID int, message []byte) {
-    h.mu.RLock()
-    defer h.mu.RUnlock()
-    
-    conns := h.clients[userID]
-    for _, conn := range conns {
-        conn.WriteMessage(websocket.TextMessage, message)
-    }
-}
-```
 ---
 
 ## Проверка работоспособности
@@ -416,7 +386,7 @@ func (h *WSHub) Broadcast(userID int, message []byte) {
 4. **Проверь Exchange:**
    - `payment_events_fanout` - fanout exchange (один-ко-всем рассылка)
 
-### Типичные логи (успешный платёж)
+### Типичные логи в консоли (успешный платёж)
 
 ```
 gozon-order    | Received payment request: OrderID=1 UserID=1 Amount=200
@@ -442,12 +412,12 @@ gozon-gateway  | Gateway received event: {"order_id":1,"user_id":1,"status":"suc
 ### 4. **Масштабируемость**
 Легко добавить новые сервисы и workers
 
-### 5. **Отказоустойчивость (Resilience)**
+### 5. **Отказоустойчивость**
 Если один сервис упал, другие продолжают работать и восстанавливают состояние
 
 ### 6. **Real-time UX**
 WebSocket уведомления прилетают мгновенно при статус-изменении
 
-### 7. **Полная типизация (Type Safety)**
+### 7. **Полная типизация**
 Go constants для статусов предотвращают ошибки со строками
 
